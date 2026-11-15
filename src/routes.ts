@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { catalogRoutes } from './modules/catalog/catalog.routes.js';
 import { resolveLang } from './lib/i18n.js';
+import { adminRoutes } from './modules/admin/admin.routes.js';
 import { healthRoutes } from './modules/health/health.routes.js';
 import { cartRoutes, orderRoutes } from './modules/orders/orders.routes.js';
 import { paymentRoutes } from './modules/payments/payment.routes.js';
@@ -19,6 +20,7 @@ v1.use('/store', storeRoutes);
 v1.use('/payments', paymentRoutes);
 v1.use('/cart', cartRoutes);
 v1.use('/orders', orderRoutes);
+v1.use('/admin', adminRoutes);
 v1.use('/', catalogRoutes);
 
 routes.use('/api/v1', v1);

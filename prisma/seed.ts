@@ -3,6 +3,7 @@
  * garments with size × colour variants. Safe to run more than once.
  */
 import 'dotenv/config';
+import { hashPassword } from '../src/lib/password.js';
 import { prisma } from '../src/lib/prisma.js';
 import { toPaisa } from '../src/lib/money.js';
 import { createProduct } from '../src/modules/catalog/product.service.js';
@@ -191,6 +192,18 @@ async function main() {
       ]),
     });
     console.log(`  + ${p.name}`);
+  }
+
+  // Demo owner for development only. Use 'npm run staff:create' for real accounts.
+  if (process.env.NODE_ENV !== 'production') {
+    const email = 'owner@demo.local';
+    const exists = await prisma.staffUser.findUnique({ where: { storeId_email: { storeId: store.id, email } } });
+    if (!exists) {
+      await prisma.staffUser.create({
+        data: { storeId: store.id, email, name: 'Demo Owner', role: 'OWNER', passwordHash: await hashPassword('demo-owner-123') },
+      });
+      console.log('  + demo owner: owner@demo.local / demo-owner-123 (development only)');
+    }
   }
 
   console.log(`Store ready: ${store.name} (${store.slug})`);

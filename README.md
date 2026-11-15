@@ -61,3 +61,58 @@ Add `?lang=ne` to get Nepali names (falls back to English).
 - Checkout is rate limited (10 per 10 minutes per buyer); order data is never cached.
 
 Send `X-Store: <slug>` to pick a shop; otherwise it is matched by domain, then `DEFAULT_STORE_SLUG`.
+
+## Admin API (`/api/v1/admin`)
+
+Sign in with `POST /admin/auth/login { email, password }`. The session is an httpOnly cookie (`sid`);
+scripts can send `Authorization: Bearer <token>` instead. Sessions last `SESSION_DAYS` and are revocable.
+
+| Role | Can use |
+|---|---|
+| STAFF | dashboard, orders, customers |
+| ADMIN | + products, variants, photos, categories, suppliers |
+| OWNER | + supplier payouts, shop settings, staff accounts |
+
+| Area | Endpoints |
+|---|---|
+| Auth | `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`, `POST /auth/password` |
+| Dashboard | `GET /dashboard` — today / 30 days, status counts, 14-day chart, low stock, top products |
+| Orders | `GET /orders?status&q&from&to&page`, `GET /orders/:number`, `POST /orders/:number/status { status, note }`, `PATCH /orders/:number { staffNote }` |
+| Products | `GET/POST /products`, `GET/PATCH/DELETE /products/:id`, `POST /products/:id/variants`, `PATCH /variants/:id`, `PATCH /option-values/:id` |
+| Photos | `POST /products/:id/images` (multipart `photos[]`, optional `optionValueId`), `PUT /products/:id/images/order { ids }`, `PATCH/DELETE /images/:id` |
+| Categories | `GET/POST /categories`, `PATCH/DELETE /categories/:id` |
+| Suppliers | `GET/POST /suppliers` (with amount owed), `PATCH/DELETE /suppliers/:id` |
+| Payouts | `GET/POST /payouts`, `GET /payouts/:id`, `POST /payouts/:id/paid`, `DELETE /payouts/:id` |
+| Customers | `GET /customers?q`, `GET /customers/:id` |
+| Settings | `GET/PATCH /settings` (partial updates: `{ settings: { theme: { preset: "bloom" } } }`) |
+| Staff | `GET/POST /staff`, `PATCH /staff/:id` |
+
+### Order statuses
+
+```
+PENDING → CONFIRMED → (PROCESSING) → SHIPPED → DELIVERED → RETURNED
+   └────────┴──────────────┴─→ CANCELLED
+```
+
+- Cancelled / returned orders put their stock back.
+- Delivered COD orders are marked paid; returned paid orders become refunded.
+- Every change is saved in the order history with the staff member who made it.
+
+### Supplier payouts
+
+A supplier is owed the wholesale price × quantity of every **delivered** item not yet in a payout.
+`POST /payouts { supplierId }` bundles it; `POST /payouts/:id/paid` records the payment.
+
+### Photos
+
+Uploads are turned into WebP (max 2000px, rotation fixed, camera data removed).
+`STORAGE_DRIVER=local` keeps them in `./uploads` (development); `s3` uses any S3-compatible
+bucket such as Cloudflare R2 — set the `S3_*` variables in `.env`.
+
+### First owner account
+
+```bash
+npm run staff:create -- --email you@shop.com --name "Your Name" --role OWNER --password "a-long-password"
+```
+
+`npm run db:seed` also creates `owner@demo.local` / `demo-owner-123` outside production.
