@@ -115,9 +115,9 @@ function toListItem(p: ListRow) {
   };
 }
 
-export async function listProducts(storeId: string, q: ListProductsQuery) {
+/** Active products in a category and/or matching a search. Shared by list and facets. */
+async function baseWhere(storeId: string, q: { category?: string; q?: string }) {
   const where: Prisma.ProductWhereInput = { storeId, status: 'ACTIVE' };
-
   if (q.category) {
     const ids = await categoryWithDescendants(storeId, q.category);
     if (!ids) throw AppError.notFound('Category not found');
@@ -129,6 +129,48 @@ export async function listProducts(storeId: string, q: ListProductsQuery) {
       { tags: { has: q.q.toLowerCase() } },
     ];
   }
+  return where;
+}
+
+const SIZE_ORDER = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL', '4XL', 'FREE SIZE'];
+const sizeRank = (v: string) => {
+  const i = SIZE_ORDER.indexOf(v.toUpperCase());
+  const n = Number.parseFloat(v);
+  return i >= 0 ? i : Number.isNaN(n) ? 1000 : 100 + n; // named sizes, then numbers (28, 30…), then the rest
+};
+
+/** The filter choices to show for a category: sizes, colours and price range. */
+export async function getProductFacets(storeId: string, q: { category?: string; q?: string }) {
+  const where = await baseWhere(storeId, q);
+  const names = [...OPTION_NAMES.size, ...OPTION_NAMES.colour];
+
+  const [price, values] = await Promise.all([
+    prisma.product.aggregate({ where, _min: { minPrice: true }, _max: { maxPrice: true } }),
+    prisma.productOptionValue.findMany({
+      where: { option: { name: { in: names, mode: 'insensitive' }, product: where } },
+      select: { value: true, swatch: true, option: { select: { name: true } } },
+    }),
+  ]);
+
+  const isSize = (n: string) => OPTION_NAMES.size.some((s) => s.toLowerCase() === n.toLowerCase());
+  const sizes = new Set<string>();
+  const colours = new Map<string, string | null>();
+  for (const v of values) {
+    if (isSize(v.option.name)) sizes.add(v.value);
+    else if (!colours.has(v.value) || !colours.get(v.value)) colours.set(v.value, v.swatch);
+  }
+
+  return {
+    sizes: [...sizes].sort((a, b) => sizeRank(a) - sizeRank(b) || a.localeCompare(b)),
+    colours: [...colours]
+      .map(([value, swatch]) => ({ value, swatch }))
+      .sort((a, b) => a.value.localeCompare(b.value)),
+    price: { min: price._min.minPrice ?? 0, max: price._max.maxPrice ?? 0 },
+  };
+}
+
+export async function listProducts(storeId: string, q: ListProductsQuery) {
+  const where = await baseWhere(storeId, q);
   // Products whose price range overlaps the requested range.
   if (q.minPrice !== undefined) where.maxPrice = { gte: q.minPrice };
   if (q.maxPrice !== undefined) where.minPrice = { lte: q.maxPrice };

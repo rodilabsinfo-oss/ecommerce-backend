@@ -43,6 +43,7 @@ src/
 | GET | `/api/v1/payments/methods` | payment options for checkout |
 | GET | `/api/v1/categories` | category tree |
 | GET | `/api/v1/products` | product list — `category`, `q`, `size`, `colour`, `minPrice`, `maxPrice` (paisa), `inStock`, `featured`, `sort` (`newest`/`price_asc`/`price_desc`/`name`), `page`, `limit` |
+| GET | `/api/v1/products/facets` | filter choices for a `category` / `q`: sizes, colours, price range |
 | GET | `/api/v1/products/:slug` | product page: options, variants, photos |
 
 Catalogue responses send short cache headers so a CDN can serve them.

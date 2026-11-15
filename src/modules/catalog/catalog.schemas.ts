@@ -74,3 +74,10 @@ export const createProductInput = z.object({
   images: z.array(imageInput).default([]),
 });
 export type CreateProductInput = z.input<typeof createProductInput>;
+
+/** Query string for GET /products/facets. */
+export const facetsQuery = z.object({
+  category: z.string().optional(),
+  q: z.string().trim().max(100).optional(),
+});
+export type FacetsQuery = z.infer<typeof facetsQuery>;

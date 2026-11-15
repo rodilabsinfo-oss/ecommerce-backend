@@ -8,7 +8,14 @@ import { toPaisa } from '../src/lib/money.js';
 import { createProduct } from '../src/modules/catalog/product.service.js';
 
 const SIZES = ['S', 'M', 'L', 'XL'];
-const photo = (seed: string) => `https://picsum.photos/seed/${seed}/800/1000`;
+/** Placeholder photo in the garment's colour, with its name on it. */
+function photo(name: string, colour: string, swatch: string, view: string) {
+  const hex = swatch.replace('#', '');
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const text = r! * 0.299 + g! * 0.587 + b! * 0.114 > 160 ? '111111' : 'ffffff';
+  const label = encodeURIComponent(`${name}\n${colour} · ${view}`);
+  return `https://placehold.co/800x1000/${hex}/${text}/png?text=${label}`;
+}
 
 async function upsertCategory(storeId: string, slug: string, name: string, parentId?: string, sortOrder = 0) {
   return prisma.category.upsert({
@@ -141,8 +148,8 @@ async function main() {
       ],
       variants: allVariants(p.colours, p.price, p.wholesale, p.compareAt),
       images: p.colours.flatMap((c) => [
-        { url: photo(`${p.slug}-${c.value}-1`), option: { name: 'Colour', value: c.value } },
-        { url: photo(`${p.slug}-${c.value}-2`), option: { name: 'Colour', value: c.value } },
+        { url: photo(p.name, c.value, c.swatch, 'Front'), option: { name: 'Colour', value: c.value } },
+        { url: photo(p.name, c.value, c.swatch, 'Back'), option: { name: 'Colour', value: c.value } },
       ]),
     });
     console.log(`  + ${p.name}`);
