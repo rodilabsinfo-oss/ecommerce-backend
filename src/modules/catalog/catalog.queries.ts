@@ -1,0 +1,221 @@
+/**
+ * Read-only catalogue queries for the storefront.
+ * Every select is written out by hand so wholesalePrice and supplier
+ * details can never leak to buyers.
+ */
+import type { Prisma } from '../../generated/prisma/client.js';
+import { AppError } from '../../lib/errors.js';
+import { prisma } from '../../lib/prisma.js';
+import type { ListProductsQuery } from './catalog.schemas.js';
+
+// ─── Categories ─────────────────────────────────────────────────────────
+
+export interface CategoryNode {
+  id: string;
+  name: string;
+  slug: string;
+  imageUrl: string | null;
+  children: CategoryNode[];
+}
+
+async function loadCategories(storeId: string) {
+  return prisma.category.findMany({
+    where: { storeId, isActive: true },
+    orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+    select: { id: true, parentId: true, name: true, slug: true, imageUrl: true },
+  });
+}
+
+export async function getCategoryTree(storeId: string): Promise<CategoryNode[]> {
+  const rows = await loadCategories(storeId);
+  const nodes = new Map<string, CategoryNode>(
+    rows.map((r) => [r.id, { id: r.id, name: r.name, slug: r.slug, imageUrl: r.imageUrl, children: [] }]),
+  );
+  const roots: CategoryNode[] = [];
+  for (const r of rows) {
+    const node = nodes.get(r.id)!;
+    const parent = r.parentId ? nodes.get(r.parentId) : undefined;
+    (parent ? parent.children : roots).push(node);
+  }
+  return roots;
+}
+
+/** The category and everything under it, so "Women" also shows "Women > Kurtas". */
+async function categoryWithDescendants(storeId: string, slug: string): Promise<string[] | null> {
+  const rows = await loadCategories(storeId);
+  const start = rows.find((r) => r.slug === slug);
+  if (!start) return null;
+  const ids = [start.id];
+  for (let i = 0; i < ids.length; i++) {
+    for (const r of rows) if (r.parentId === ids[i]) ids.push(r.id);
+  }
+  return ids;
+}
+
+// ─── Product list ───────────────────────────────────────────────────────
+
+const OPTION_NAMES = { size: ['Size'], colour: ['Colour', 'Color'] };
+
+const hasOptionValue = (names: string[], values: string[]): Prisma.ProductVariantWhereInput => ({
+  optionValues: {
+    some: {
+      optionValue: {
+        value: { in: values, mode: 'insensitive' },
+        option: { name: { in: names, mode: 'insensitive' } },
+      },
+    },
+  },
+});
+
+const ORDER_BY: Record<ListProductsQuery['sort'], Prisma.ProductOrderByWithRelationInput[]> = {
+  newest: [{ createdAt: 'desc' }, { id: 'desc' }],
+  price_asc: [{ minPrice: 'asc' }, { id: 'desc' }],
+  price_desc: [{ maxPrice: 'desc' }, { id: 'desc' }],
+  name: [{ name: 'asc' }, { id: 'desc' }],
+};
+
+const listSelect = {
+  id: true,
+  name: true,
+  slug: true,
+  minPrice: true,
+  maxPrice: true,
+  totalStock: true,
+  isFeatured: true,
+  images: {
+    orderBy: { position: 'asc' },
+    take: 2, // main photo + the one shown on hover
+    select: { url: true, alt: true, width: true, height: true },
+  },
+  variants: {
+    where: { isActive: true },
+    select: { price: true, compareAtPrice: true },
+  },
+  options: {
+    orderBy: { position: 'asc' },
+    select: { name: true, values: { orderBy: { position: 'asc' }, select: { value: true, swatch: true } } },
+  },
+} satisfies Prisma.ProductSelect;
+
+type ListRow = Prisma.ProductGetPayload<{ select: typeof listSelect }>;
+
+function toListItem(p: ListRow) {
+  // Show the biggest "was" price among variants at the lowest price.
+  const cheapest = p.variants.filter((v) => v.price === p.minPrice);
+  const compareAt = Math.max(0, ...cheapest.map((v) => v.compareAtPrice ?? 0));
+  return {
+    id: p.id,
+    name: p.name,
+    slug: p.slug,
+    price: { min: p.minPrice, max: p.maxPrice, compareAt: compareAt > p.minPrice ? compareAt : null },
+    inStock: p.totalStock > 0,
+    isFeatured: p.isFeatured,
+    images: p.images,
+    options: p.options,
+  };
+}
+
+export async function listProducts(storeId: string, q: ListProductsQuery) {
+  const where: Prisma.ProductWhereInput = { storeId, status: 'ACTIVE' };
+
+  if (q.category) {
+    const ids = await categoryWithDescendants(storeId, q.category);
+    if (!ids) throw AppError.notFound('Category not found');
+    where.categoryId = { in: ids };
+  }
+  if (q.q) {
+    where.OR = [
+      { name: { contains: q.q, mode: 'insensitive' } },
+      { tags: { has: q.q.toLowerCase() } },
+    ];
+  }
+  // Products whose price range overlaps the requested range.
+  if (q.minPrice !== undefined) where.maxPrice = { gte: q.minPrice };
+  if (q.maxPrice !== undefined) where.minPrice = { lte: q.maxPrice };
+  if (q.inStock) where.totalStock = { gt: 0 };
+  if (q.featured !== undefined) where.isFeatured = q.featured;
+
+  // Size and colour must match the SAME variant (a red M, not a red S + a blue M).
+  const variantFilters: Prisma.ProductVariantWhereInput[] = [];
+  if (q.size?.length) variantFilters.push(hasOptionValue(OPTION_NAMES.size, q.size));
+  if (q.colour?.length) variantFilters.push(hasOptionValue(OPTION_NAMES.colour, q.colour));
+  if (variantFilters.length) {
+    where.variants = {
+      some: { isActive: true, ...(q.inStock ? { stock: { gt: 0 } } : {}), AND: variantFilters },
+    };
+  }
+
+  const [total, rows] = await Promise.all([
+    prisma.product.count({ where }),
+    prisma.product.findMany({
+      where,
+      orderBy: ORDER_BY[q.sort],
+      skip: (q.page - 1) * q.limit,
+      take: q.limit,
+      select: listSelect,
+    }),
+  ]);
+
+  return {
+    data: rows.map(toListItem),
+    meta: { page: q.page, limit: q.limit, total, pages: Math.ceil(total / q.limit) },
+  };
+}
+
+// ─── Product page ───────────────────────────────────────────────────────
+
+export async function getProductBySlug(storeId: string, slug: string) {
+  const p = await prisma.product.findUnique({
+    where: { storeId_slug: { storeId, slug } },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      description: true,
+      status: true,
+      tags: true,
+      seoTitle: true,
+      seoDescription: true,
+      minPrice: true,
+      maxPrice: true,
+      totalStock: true,
+      category: { select: { id: true, name: true, slug: true } },
+      options: {
+        orderBy: { position: 'asc' },
+        select: {
+          id: true,
+          name: true,
+          values: { orderBy: { position: 'asc' }, select: { id: true, value: true, swatch: true } },
+        },
+      },
+      variants: {
+        where: { isActive: true },
+        orderBy: { position: 'asc' },
+        select: {
+          id: true,
+          sku: true,
+          price: true,
+          compareAtPrice: true,
+          stock: true,
+          optionValues: { select: { optionValueId: true } },
+        },
+      },
+      images: {
+        orderBy: { position: 'asc' },
+        select: { id: true, url: true, alt: true, width: true, height: true, optionValueId: true },
+      },
+    },
+  });
+
+  if (!p || p.status !== 'ACTIVE') throw AppError.notFound('Product not found');
+
+  const { status: _status, totalStock, variants, ...rest } = p;
+  return {
+    ...rest,
+    inStock: totalStock > 0,
+    variants: variants.map(({ optionValues, ...v }) => ({
+      ...v,
+      optionValueIds: optionValues.map((o) => o.optionValueId),
+    })),
+  };
+}
