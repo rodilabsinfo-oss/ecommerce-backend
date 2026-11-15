@@ -306,14 +306,18 @@ enum PaymentStatus {
 }
 
 model Order {
-  id            String        @id @default(uuid(7)) @db.Uuid
-  storeId       String        @db.Uuid
+  id             String        @id @default(uuid(7)) @db.Uuid
+  storeId        String        @db.Uuid
   /// Human-friendly number shown to buyers, unique per shop (e.g. 1001).
-  orderNumber   Int
-  customerId    String        @db.Uuid
-  status        OrderStatus   @default(PENDING)
-  paymentMethod PaymentMethod
-  paymentStatus PaymentStatus @default(PENDING)
+  orderNumber    Int
+  /// Sent by the storefront with each checkout attempt, so a double tap never creates two orders.
+  idempotencyKey String?
+  /// Language the buyer used (en / ne), for messages about the order.
+  lang           String        @default("en")
+  customerId     String        @db.Uuid
+  status         OrderStatus   @default(PENDING)
+  paymentMethod  PaymentMethod
+  paymentStatus  PaymentStatus @default(PENDING)
 
   subtotal    Int
   shippingFee Int @default(0)
@@ -344,6 +348,7 @@ model Order {
   events   OrderEvent[]
 
   @@unique([storeId, orderNumber])
+  @@unique([storeId, idempotencyKey])
   @@index([storeId, status, createdAt])
   @@index([customerId])
 }
