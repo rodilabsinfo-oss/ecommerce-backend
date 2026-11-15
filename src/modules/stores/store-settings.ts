@@ -10,9 +10,16 @@ export const storeSettingsSchema = z.object({
   theme: z
     .object({
       logoUrl: z.string().optional(),
-      primaryColor: z.string().default('#111827'),
-      accentColor: z.string().default('#e11d48'),
-      fontFamily: z.string().default('Inter'),
+      /** Ready-made look: atelier (black + gold, elegant), bloom (rose, boutique), studio (bold, streetwear). */
+      preset: z.enum(['atelier', 'bloom', 'studio']).default('atelier'),
+      /** What buyers see first; they can still switch. */
+      colorMode: z.enum(['system', 'light', 'dark']).default('system'),
+      /** Optional brand colours that replace the preset's (light mode only). */
+      primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+      accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+      /** Big text on the home page banner. */
+      heroTitle: z.string().optional(),
+      heroSubtitle: z.string().optional(),
     })
     .prefault({}),
   contact: z

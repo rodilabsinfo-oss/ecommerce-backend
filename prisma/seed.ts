@@ -8,6 +8,20 @@ import { toPaisa } from '../src/lib/money.js';
 import { createProduct } from '../src/modules/catalog/product.service.js';
 
 const SIZES = ['S', 'M', 'L', 'XL'];
+
+/** Demo shop look and contact details (fake numbers). */
+const DEMO_SETTINGS = {
+  theme: {
+    preset: 'atelier',
+    colorMode: 'system',
+    heroTitle: 'Dressed for every day, made for you',
+    heroSubtitle: 'Kurtas, tops and shirts delivered all over Nepal. Pay cash when it arrives.',
+  },
+  contact: { phone: '9800000000', whatsapp: '9779800000000', email: 'hello@example.com', address: 'Kathmandu, Nepal' },
+  social: { facebook: 'https://facebook.com', instagram: 'https://instagram.com', tiktok: 'https://tiktok.com' },
+  payments: { enabled: ['COD'] },
+  shipping: { flatFee: 10000, freeAbove: 300000 },
+};
 /** Placeholder photo in the garment's colour, with its name on it. */
 function photo(name: string, colour: string, swatch: string, view: string) {
   const hex = swatch.replace('#', '');
@@ -46,11 +60,11 @@ function allVariants(
 async function main() {
   const store = await prisma.store.upsert({
     where: { slug: 'main' },
-    update: {},
+    update: process.env.SEED_RESET_SETTINGS ? { settings: DEMO_SETTINGS } : {},
     create: {
       slug: 'main',
       name: 'Demo Clothing Store',
-      settings: { payments: { enabled: ['COD'] } },
+      settings: DEMO_SETTINGS,
     },
   });
 
