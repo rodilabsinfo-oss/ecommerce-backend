@@ -5,6 +5,7 @@
  */
 import type { Prisma } from '../../generated/prisma/client.js';
 import { AppError } from '../../lib/errors.js';
+import { type Lang, t } from '../../lib/i18n.js';
 import { prisma } from '../../lib/prisma.js';
 import type { ListProductsQuery } from './catalog.schemas.js';
 
@@ -22,14 +23,17 @@ async function loadCategories(storeId: string) {
   return prisma.category.findMany({
     where: { storeId, isActive: true },
     orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-    select: { id: true, parentId: true, name: true, slug: true, imageUrl: true },
+    select: { id: true, parentId: true, name: true, slug: true, imageUrl: true, translations: true },
   });
 }
 
-export async function getCategoryTree(storeId: string): Promise<CategoryNode[]> {
+export async function getCategoryTree(storeId: string, lang: Lang = 'en'): Promise<CategoryNode[]> {
   const rows = await loadCategories(storeId);
   const nodes = new Map<string, CategoryNode>(
-    rows.map((r) => [r.id, { id: r.id, name: r.name, slug: r.slug, imageUrl: r.imageUrl, children: [] }]),
+    rows.map((r) => [
+      r.id,
+      { id: r.id, name: t(r.translations, lang, 'name', r.name), slug: r.slug, imageUrl: r.imageUrl, children: [] },
+    ]),
   );
   const roots: CategoryNode[] = [];
   for (const r of rows) {
@@ -78,6 +82,7 @@ const listSelect = {
   id: true,
   name: true,
   slug: true,
+  translations: true,
   minPrice: true,
   maxPrice: true,
   totalStock: true,
@@ -99,18 +104,18 @@ const listSelect = {
 
 type ListRow = Prisma.ProductGetPayload<{ select: typeof listSelect }>;
 
-function toListItem(p: ListRow) {
+function toListItem(p: ListRow, lang: Lang) {
   // Show the biggest "was" price among variants at the lowest price.
   const cheapest = p.variants.filter((v) => v.price === p.minPrice);
   const compareAt = Math.max(0, ...cheapest.map((v) => v.compareAtPrice ?? 0));
   return {
     id: p.id,
-    name: p.name,
+    name: t(p.translations, lang, 'name', p.name),
     slug: p.slug,
     price: { min: p.minPrice, max: p.maxPrice, compareAt: compareAt > p.minPrice ? compareAt : null },
     inStock: p.totalStock > 0,
     isFeatured: p.isFeatured,
-    images: p.images,
+    images: p.images.map((i) => ({ ...i, alt: i.alt === p.name ? t(p.translations, lang, 'name', p.name) : i.alt })),
     options: p.options,
   };
 }
@@ -127,6 +132,8 @@ async function baseWhere(storeId: string, q: { category?: string; q?: string }) 
     where.OR = [
       { name: { contains: q.q, mode: 'insensitive' } },
       { tags: { has: q.q.toLowerCase() } },
+      // Nepali names, e.g. "कुर्ता"
+      { translations: { path: ['ne', 'name'], string_contains: q.q } },
     ];
   }
   return where;
@@ -169,7 +176,7 @@ export async function getProductFacets(storeId: string, q: { category?: string; 
   };
 }
 
-export async function listProducts(storeId: string, q: ListProductsQuery) {
+export async function listProducts(storeId: string, q: ListProductsQuery, lang: Lang = 'en') {
   const where = await baseWhere(storeId, q);
   // Products whose price range overlaps the requested range.
   if (q.minPrice !== undefined) where.maxPrice = { gte: q.minPrice };
@@ -199,14 +206,14 @@ export async function listProducts(storeId: string, q: ListProductsQuery) {
   ]);
 
   return {
-    data: rows.map(toListItem),
+    data: rows.map((r) => toListItem(r, lang)),
     meta: { page: q.page, limit: q.limit, total, pages: Math.ceil(total / q.limit) },
   };
 }
 
 // ─── Product page ───────────────────────────────────────────────────────
 
-export async function getProductBySlug(storeId: string, slug: string) {
+export async function getProductBySlug(storeId: string, slug: string, lang: Lang = 'en') {
   const p = await prisma.product.findUnique({
     where: { storeId_slug: { storeId, slug } },
     select: {
@@ -216,12 +223,13 @@ export async function getProductBySlug(storeId: string, slug: string) {
       description: true,
       status: true,
       tags: true,
+      translations: true,
       seoTitle: true,
       seoDescription: true,
       minPrice: true,
       maxPrice: true,
       totalStock: true,
-      category: { select: { id: true, name: true, slug: true } },
+      category: { select: { id: true, name: true, slug: true, translations: true } },
       options: {
         orderBy: { position: 'asc' },
         select: {
@@ -251,9 +259,16 @@ export async function getProductBySlug(storeId: string, slug: string) {
 
   if (!p || p.status !== 'ACTIVE') throw AppError.notFound('Product not found');
 
-  const { status: _status, totalStock, variants, ...rest } = p;
+  const { status: _status, totalStock, variants, translations, category, ...rest } = p;
+  const name = t(translations, lang, 'name', p.name);
   return {
     ...rest,
+    name,
+    description: t(translations, lang, 'description', p.description),
+    seoTitle: t(translations, lang, 'seoTitle', p.seoTitle),
+    seoDescription: t(translations, lang, 'seoDescription', p.seoDescription),
+    category: category && { id: category.id, slug: category.slug, name: t(category.translations, lang, 'name', category.name) },
+    images: p.images.map((i) => ({ ...i, alt: i.alt === p.name ? name : i.alt })),
     inStock: totalStock > 0,
     variants: variants.map(({ optionValues, ...v }) => ({
       ...v,

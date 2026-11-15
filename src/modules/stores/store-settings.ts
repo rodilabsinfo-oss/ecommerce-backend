@@ -22,6 +22,10 @@ export const storeSettingsSchema = z.object({
       heroSubtitle: z.string().optional(),
     })
     .prefault({}),
+  /** Shop text in other languages, e.g. { ne: { heroTitle: '…', heroSubtitle: '…' } }. */
+  translations: z
+    .record(z.string(), z.object({ heroTitle: z.string().optional(), heroSubtitle: z.string().optional() }))
+    .default({}),
   contact: z
     .object({
       phone: z.string().optional(),

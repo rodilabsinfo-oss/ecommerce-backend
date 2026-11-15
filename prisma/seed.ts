@@ -19,6 +19,12 @@ const DEMO_SETTINGS = {
   },
   contact: { phone: '9800000000', whatsapp: '9779800000000', email: 'hello@example.com', address: 'Kathmandu, Nepal' },
   social: { facebook: 'https://facebook.com', instagram: 'https://instagram.com', tiktok: 'https://tiktok.com' },
+  translations: {
+    ne: {
+      heroTitle: 'हरेक दिन लगाउन मिल्ने, तपाईंकै लागि',
+      heroSubtitle: 'कुर्ता, टप र सर्ट नेपालभर घरमै पुर्‍याउँछौं। सामान हातमा आएपछि मात्र पैसा तिर्नुहोस्।',
+    },
+  },
   payments: { enabled: ['COD'] },
   shipping: { flatFee: 10000, freeAbove: 300000 },
 };
@@ -31,11 +37,19 @@ function photo(name: string, colour: string, swatch: string, view: string) {
   return `https://placehold.co/800x1000/${hex}/${text}/png?text=${label}`;
 }
 
-async function upsertCategory(storeId: string, slug: string, name: string, parentId?: string, sortOrder = 0) {
+async function upsertCategory(
+  storeId: string,
+  slug: string,
+  name: string,
+  nameNe: string,
+  parentId?: string,
+  sortOrder = 0,
+) {
+  const translations = { ne: { name: nameNe } };
   return prisma.category.upsert({
     where: { storeId_slug: { storeId, slug } },
-    update: {},
-    create: { storeId, slug, name, parentId, sortOrder },
+    update: { translations },
+    create: { storeId, slug, name, parentId, sortOrder, translations },
   });
 }
 
@@ -68,12 +82,12 @@ async function main() {
     },
   });
 
-  const women = await upsertCategory(store.id, 'women', 'Women', undefined, 1);
-  const men = await upsertCategory(store.id, 'men', 'Men', undefined, 2);
-  const kurtas = await upsertCategory(store.id, 'kurtas', 'Kurtas', women.id);
-  const tops = await upsertCategory(store.id, 'tops', 'Tops', women.id);
-  const shirts = await upsertCategory(store.id, 'shirts', 'Shirts', men.id);
-  const tshirts = await upsertCategory(store.id, 't-shirts', 'T-Shirts', men.id);
+  const women = await upsertCategory(store.id, 'women', 'Women', 'महिला', undefined, 1);
+  const men = await upsertCategory(store.id, 'men', 'Men', 'पुरुष', undefined, 2);
+  const kurtas = await upsertCategory(store.id, 'kurtas', 'Kurtas', 'कुर्ता', women.id);
+  const tops = await upsertCategory(store.id, 'tops', 'Tops', 'टप', women.id);
+  const shirts = await upsertCategory(store.id, 'shirts', 'Shirts', 'सर्ट', men.id);
+  const tshirts = await upsertCategory(store.id, 't-shirts', 'T-Shirts', 'टी-सर्ट', men.id);
 
   const supplier =
     (await prisma.supplier.findFirst({ where: { storeId: store.id, name: 'Garment Supplier' } })) ??
@@ -82,6 +96,7 @@ async function main() {
   const products = [
     {
       name: 'Cotton Printed Kurta',
+      nameNe: 'प्रिन्टेड सुती कुर्ता',
       slug: 'cotton-printed-kurta',
       categoryId: kurtas.id,
       colours: [
@@ -96,6 +111,7 @@ async function main() {
     },
     {
       name: 'Rayon Straight Kurta',
+      nameNe: 'रेयन स्ट्रेट कुर्ता',
       slug: 'rayon-straight-kurta',
       categoryId: kurtas.id,
       colours: [{ value: 'Mustard', swatch: '#d4a017' }],
@@ -105,6 +121,7 @@ async function main() {
     },
     {
       name: 'Puff Sleeve Crop Top',
+      nameNe: 'पफ बाहुला क्रप टप',
       slug: 'puff-sleeve-crop-top',
       categoryId: tops.id,
       colours: [
@@ -117,6 +134,7 @@ async function main() {
     },
     {
       name: 'Linen Casual Shirt',
+      nameNe: 'लिनेन क्याजुअल सर्ट',
       slug: 'linen-casual-shirt',
       categoryId: shirts.id,
       colours: [
@@ -131,6 +149,7 @@ async function main() {
     },
     {
       name: 'Oversized Graphic T-Shirt',
+      nameNe: 'ओभरसाइज ग्राफिक टी-सर्ट',
       slug: 'oversized-graphic-t-shirt',
       categoryId: tshirts.id,
       colours: [
@@ -145,7 +164,11 @@ async function main() {
 
   for (const p of products) {
     const exists = await prisma.product.findUnique({ where: { storeId_slug: { storeId: store.id, slug: p.slug } } });
-    if (exists) continue;
+    const translations = { ne: { name: p.nameNe, description: `${p.nameNe}। लगाउन सजिलो, हरेक दिनका लागि आरामदायी।` } };
+    if (exists) {
+      if (process.env.SEED_RESET_SETTINGS) await prisma.product.update({ where: { id: exists.id }, data: { translations } });
+      continue;
+    }
 
     await createProduct(store.id, {
       name: p.name,
@@ -156,6 +179,7 @@ async function main() {
       categoryId: p.categoryId,
       supplierId: supplier.id,
       tags: p.tags,
+      translations,
       options: [
         { name: 'Size', values: SIZES.map((value) => ({ value })) },
         { name: 'Colour', values: p.colours },

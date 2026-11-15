@@ -61,6 +61,7 @@ export async function createProduct(storeId: string, rawInput: CreateProductInpu
         tags: input.tags,
         seoTitle: input.seoTitle,
         seoDescription: input.seoDescription,
+        translations: input.translations,
         options: {
           create: input.options.map((o, i) => ({
             name: o.name,

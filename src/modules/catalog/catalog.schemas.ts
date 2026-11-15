@@ -67,6 +67,10 @@ export const createProductInput = z.object({
   tags: z.array(z.string()).default([]),
   seoTitle: z.string().optional(),
   seoDescription: z.string().optional(),
+  /** Other languages, e.g. { ne: { name: 'कुर्ता', description: '…' } }. */
+  translations: z
+    .record(z.string(), z.object({ name: z.string(), description: z.string() }).partial())
+    .default({}),
   options: z
     .array(z.object({ name: z.string().trim().min(1), values: z.array(optionValueInput).min(1) }))
     .default([]),
