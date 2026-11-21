@@ -116,3 +116,48 @@ npm run staff:create -- --email you@shop.com --name "Your Name" --role OWNER --p
 ```
 
 `npm run db:seed` also creates `owner@demo.local` / `demo-owner-123` outside production.
+
+## Shops
+
+| Slug | Shop | Seed |
+|---|---|---|
+| `main` | Demo clothing shop | `prisma/seed.ts` |
+| `kangaroo` | Kangaroo Mobile Zone, Birtamode: Apple phones, Macs, watches, accessories | `prisma/seeds/kangaroo.ts` |
+
+`SEED_STORES=kangaroo npm run db:seed` creates only that shop. Its prices and stock are samples; the shop
+edits them from the staff desk. `catalog.kind` in the shop settings is `fashion` or `electronics`; electronics
+shops use a `Storage` option (256GB, 1TB) where clothing uses `Size`, and the storefront talks about
+warranty instead of size exchange.
+
+## Deploy on Railway
+
+The repo has a `Dockerfile` and `railway.json`. Each deploy builds the API, applies new database
+migrations (`prisma migrate deploy`), then starts it. Railway checks `/health`.
+
+1. In a Railway project: **New → Database → PostgreSQL**.
+2. **New → GitHub repo → ecommerce-backend**. Add these variables to the service:
+
+   | Variable | Value |
+   |---|---|
+   | `NODE_ENV` | `production` |
+   | `PORT` | `4000` (fixed, so the storefront can reach it on the private network) |
+   | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` |
+   | `DEFAULT_STORE_SLUG` | `kangaroo` |
+   | `CORS_ORIGINS` | the storefront address, e.g. `https://kangaroo.up.railway.app` |
+   | `PUBLIC_URL` | this API's own address, e.g. `https://kangaroo-api.up.railway.app` |
+   | `COOKIE_SECURE` | `true` |
+   | `LOG_LEVEL` | `info` |
+   | `STORAGE_DRIVER` | `local` for now (see photos below), `s3` once R2 keys are ready |
+
+3. **Settings → Networking → Generate domain** (or add your own, e.g. `api.yourshop.com`).
+4. Photos: with `STORAGE_DRIVER=local`, add a **Volume** to the API service mounted at `/app/uploads`,
+   otherwise uploaded photos disappear on the next deploy. With R2, set the `S3_*` variables instead.
+5. Load the shop once, from your computer, using the database's **public** address
+   (Postgres service → Connect → Public network):
+
+   ```bash
+   DATABASE_URL="<public postgres url>" NODE_ENV=production SEED_STORES=kangaroo npm run db:seed
+   DATABASE_URL="<public postgres url>" npm run staff:create -- --email owner@yourshop.com --name "Owner" --role OWNER --password "a-long-password"
+   ```
+
+   `npm run db:seed` uses `.env` through `dotenv`; a `DATABASE_URL` given on the command line wins.

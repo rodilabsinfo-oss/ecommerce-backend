@@ -6,7 +6,7 @@ export const storeRoutes = Router();
 /** Public shop info the storefront needs on first load. */
 storeRoutes.get('/current', (req, res) => {
   const { id, slug, name, currency } = req.store;
-  const { theme, contact, social, tracking, shipping, translations } = getStoreSettings(req.store);
+  const { theme, contact, social, tracking, shipping, catalog, translations } = getStoreSettings(req.store);
   const local = translations[req.lang] ?? {};
   res.json({
     data: {
@@ -14,8 +14,14 @@ storeRoutes.get('/current', (req, res) => {
       slug,
       name,
       currency,
-      theme: { ...theme, heroTitle: local.heroTitle ?? theme.heroTitle, heroSubtitle: local.heroSubtitle ?? theme.heroSubtitle },
-      contact,
+      theme: {
+        ...theme,
+        heroEyebrow: local.heroEyebrow ?? theme.heroEyebrow,
+        heroTitle: local.heroTitle ?? theme.heroTitle,
+        heroSubtitle: local.heroSubtitle ?? theme.heroSubtitle,
+      },
+      catalog,
+      contact: { ...contact, address: local.address ?? contact.address, hours: local.hours ?? contact.hours },
       social,
       tracking,
       shipping,

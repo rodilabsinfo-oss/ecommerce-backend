@@ -48,7 +48,8 @@ const variantInput = z.object({
 });
 
 const imageInput = z.object({
-  url: z.string().url(),
+  /** Full address, or a path served by the storefront itself (e.g. "/brands/kangaroo/…"). */
+  url: z.union([z.string().url(), z.string().regex(/^\/[^/]/)]),
   alt: z.string().optional(),
   width: z.number().int().positive().optional(),
   height: z.number().int().positive().optional(),

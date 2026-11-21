@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { rateLimit } from 'express-rate-limit';
+import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
 import { z } from 'zod';
 import { env } from '../../config/env.js';
 import { AppError } from '../../lib/errors.js';
@@ -20,7 +20,7 @@ const loginLimit = rateLimit({
   limit: 8,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
-  keyGenerator: (req) => `${req.store?.id}:${req.ip}:${String(req.body?.email ?? '').toLowerCase()}`,
+  keyGenerator: (req) => `${req.store?.id}:${ipKeyGenerator(req.ip ?? '')}:${String(req.body?.email ?? '').toLowerCase()}`,
   handler: (_req, _res, next) => next(new AppError(429, 'TOO_MANY_REQUESTS', 'Too many sign-in tries. Wait 10 minutes.')),
 });
 

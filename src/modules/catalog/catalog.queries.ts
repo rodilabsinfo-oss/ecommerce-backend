@@ -58,7 +58,8 @@ async function categoryWithDescendants(storeId: string, slug: string): Promise<s
 
 // ─── Product list ───────────────────────────────────────────────────────
 
-const OPTION_NAMES = { size: ['Size'], colour: ['Colour', 'Color'] };
+/** Options that filter as "size": clothing sizes, phone storage, watch case sizes. */
+const OPTION_NAMES = { size: ['Size', 'Storage', 'Capacity'], colour: ['Colour', 'Color', 'Finish'] };
 
 const hasOptionValue = (names: string[], values: string[]): Prisma.ProductVariantWhereInput => ({
   optionValues: {
@@ -142,8 +143,12 @@ async function baseWhere(storeId: string, q: { category?: string; q?: string }) 
 const SIZE_ORDER = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL', '4XL', 'FREE SIZE'];
 const sizeRank = (v: string) => {
   const i = SIZE_ORDER.indexOf(v.toUpperCase());
+  if (i >= 0) return i;
+  // Storage: 128GB < 256GB < 1TB < 2TB
+  const mem = /^(\d+(?:\.\d+)?)\s*(GB|TB)$/i.exec(v.trim());
+  if (mem) return 100_000 + Number(mem[1]) * (mem[2]!.toUpperCase() === 'TB' ? 1024 : 1);
   const n = Number.parseFloat(v);
-  return i >= 0 ? i : Number.isNaN(n) ? 1000 : 100 + n; // named sizes, then numbers (28, 30…), then the rest
+  return Number.isNaN(n) ? 1_000_000 : 100 + n; // named sizes, then numbers (28, 30, 42mm…), then the rest
 };
 
 /** The filter choices to show for a category: sizes, colours and price range. */

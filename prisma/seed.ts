@@ -1,12 +1,21 @@
 /**
- * Development data: one shop, a few categories, one supplier and some
- * garments with size × colour variants. Safe to run more than once.
+ * Shops and starter data. Safe to run more than once.
+ *
+ *   main      demo clothing shop: garments with size × colour variants
+ *   kangaroo  Kangaroo Mobile Zone: Apple phones, Macs and accessories (prisma/seeds/kangaroo.ts)
+ *
+ * SEED_STORES picks which ones to create, e.g. SEED_STORES=kangaroo. Default: both.
+ * SEED_RESET_SETTINGS=1 rewrites shop settings and texts from this file.
  */
 import 'dotenv/config';
 import { hashPassword } from '../src/lib/password.js';
 import { prisma } from '../src/lib/prisma.js';
 import { toPaisa } from '../src/lib/money.js';
 import { createProduct } from '../src/modules/catalog/product.service.js';
+import { seedKangaroo } from './seeds/kangaroo.js';
+
+const STORES = (process.env.SEED_STORES ?? 'main,kangaroo').split(',').map((s) => s.trim());
+const RESET = Boolean(process.env.SEED_RESET_SETTINGS);
 
 const SIZES = ['S', 'M', 'L', 'XL'];
 
@@ -72,7 +81,27 @@ function allVariants(
   );
 }
 
+/** Owner login for local testing only. Use 'npm run staff:create' for real accounts. */
+async function devOwner(storeId: string, email: string, password: string) {
+  if (process.env.NODE_ENV === 'production') return;
+  const exists = await prisma.staffUser.findUnique({ where: { storeId_email: { storeId, email } } });
+  if (exists) return;
+  await prisma.staffUser.create({
+    data: { storeId, email, name: 'Demo Owner', role: 'OWNER', passwordHash: await hashPassword(password) },
+  });
+  console.log(`  + demo owner: ${email} / ${password} (development only)`);
+}
+
 async function main() {
+  if (STORES.includes('main')) await seedDemoClothing();
+  if (STORES.includes('kangaroo')) {
+    const store = await seedKangaroo({ resetSettings: RESET });
+    await devOwner(store.id, 'owner@kangaroo.local', 'kangaroo-owner-123');
+    console.log(`Store ready: ${store.name} (${store.slug})`);
+  }
+}
+
+async function seedDemoClothing() {
   const store = await prisma.store.upsert({
     where: { slug: 'main' },
     update: process.env.SEED_RESET_SETTINGS ? { settings: DEMO_SETTINGS } : {},
@@ -194,17 +223,7 @@ async function main() {
     console.log(`  + ${p.name}`);
   }
 
-  // Demo owner for development only. Use 'npm run staff:create' for real accounts.
-  if (process.env.NODE_ENV !== 'production') {
-    const email = 'owner@demo.local';
-    const exists = await prisma.staffUser.findUnique({ where: { storeId_email: { storeId: store.id, email } } });
-    if (!exists) {
-      await prisma.staffUser.create({
-        data: { storeId: store.id, email, name: 'Demo Owner', role: 'OWNER', passwordHash: await hashPassword('demo-owner-123') },
-      });
-      console.log('  + demo owner: owner@demo.local / demo-owner-123 (development only)');
-    }
-  }
+  await devOwner(store.id, 'owner@demo.local', 'demo-owner-123');
 
   console.log(`Store ready: ${store.name} (${store.slug})`);
 }

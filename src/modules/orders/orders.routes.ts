@@ -1,5 +1,5 @@
 import { type RequestHandler, Router } from 'express';
-import { rateLimit } from 'express-rate-limit';
+import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
 import { AppError } from '../../lib/errors.js';
 import { validate } from '../../middleware/validate.js';
 import { quoteCart } from './cart.service.js';
@@ -13,7 +13,7 @@ const limit = (windowMinutes: number, max: number) =>
     limit: max,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
-    keyGenerator: (req) => `${req.store?.id}:${req.ip}`,
+    keyGenerator: (req) => `${req.store?.id}:${ipKeyGenerator(req.ip ?? '')}`,
     handler: (_req, _res, next) => next(new AppError(429, 'TOO_MANY_REQUESTS', 'Too many tries. Please wait a moment.')),
   });
 
