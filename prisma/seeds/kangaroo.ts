@@ -25,13 +25,13 @@ export const KANGAROO_SETTINGS = {
     accentColorDark: '#ff4d4f',
     heroEyebrow: 'Kangaroo Mobile Zone · Birtamode',
     heroTitle: 'The latest Apple, in your hands today.',
-    heroSubtitle: 'iPhone, iPad, Mac, Apple Watch and AirPods. Genuine products, sealed boxes and expert setup. Visit us in Birtamode or order for delivery.',
+    heroSubtitle: 'New and checked used iPhones, iPad, Mac, Apple Watch, AirPods and phone accessories. Genuine products and expert setup. Visit us in Birtamode or order for delivery.',
   },
   translations: {
     ne: {
       heroEyebrow: 'कङ्गारु मोबाइल जोन · बिर्तामोड',
       heroTitle: 'नयाँ एप्पल, आजै तपाईंको हातमा।',
-      heroSubtitle: 'आईफोन, आईप्याड, म्याक, एप्पल वाच र एयरपड्स। सक्कली सामान, सिल गरिएको बाकस र सेटअपमा सहयोग। बिर्तामोडमा आउनुहोस् वा घरमै मगाउनुहोस्।',
+      heroSubtitle: 'नयाँ र जाँच गरिएका सेकेन्डह्यान्ड आईफोन, आईप्याड, म्याक, एप्पल वाच, एयरपड्स र फोन एक्सेसरिज। सक्कली सामान र सेटअपमा सहयोग। बिर्तामोडमा आउनुहोस् वा घरमै मगाउनुहोस्।',
       address: 'बिर्तामोड, झापा, कोशी प्रदेश',
     },
   },
@@ -43,26 +43,45 @@ export const KANGAROO_SETTINGS = {
   shipping: { flatFee: toPaisa(150), freeAbove: toPaisa(10000) },
 };
 
+/** Menu order. Children appear under their parent (Phone Accessories → Phone Cases, …). */
 const CATEGORIES = [
   { slug: 'iphone', name: 'iPhone', ne: 'आईफोन' },
+  { slug: 'used-phones', name: 'Used Phones', ne: 'सेकेन्डह्यान्ड फोन' },
   { slug: 'ipad', name: 'iPad', ne: 'आईप्याड' },
   { slug: 'mac', name: 'Mac', ne: 'म्याक' },
   { slug: 'watch', name: 'Watch', ne: 'एप्पल वाच' },
   { slug: 'airpods', name: 'AirPods', ne: 'एयरपड्स' },
-  { slug: 'accessories', name: 'Accessories', ne: 'एक्सेसरिज' },
+  { slug: 'phone-accessories', name: 'Phone Accessories', ne: 'फोन एक्सेसरिज' },
+  { slug: 'phone-cases', name: 'Phone Cases', ne: 'फोन कभर', parent: 'phone-accessories' },
+  { slug: 'chargers-cables', name: 'Chargers & Cables', ne: 'चार्जर र केबल', parent: 'phone-accessories' },
+  { slug: 'car-chargers', name: 'Car Chargers', ne: 'कार चार्जर', parent: 'phone-accessories' },
+  { slug: 'speakers', name: 'Speakers', ne: 'स्पिकर', parent: 'phone-accessories' },
 ] as const;
 
 type Colour = { value: string; swatch: string };
 /** One storage / size choice and its price in rupees. */
 type Tier = { value: string; price: number; compareAt?: number };
+/** Used phones: condition grade and how much it changes the price, in rupees. */
+type Condition = { value: string; delta: number };
 
 export interface CatalogueItem {
   name: string;
   slug: string;
   category: (typeof CATEGORIES)[number]['slug'];
   /** Which drawing to use for the demo photo. */
-  kind: 'phone' | 'laptop' | 'tablet' | 'watch' | 'airpods' | 'adapter' | 'magsafe' | 'cable' | 'case';
-  style?: 'pro' | 'air' | 'standard' | 'ultra';
+  kind:
+    | 'phone'
+    | 'laptop'
+    | 'tablet'
+    | 'watch'
+    | 'airpods'
+    | 'adapter'
+    | 'magsafe'
+    | 'cable'
+    | 'case'
+    | 'carcharger'
+    | 'speaker';
+  style?: 'pro' | 'pro-classic' | 'air' | 'standard' | 'ultra' | 'silicone' | 'mount' | 'flip' | 'mini';
   description: string;
   descriptionNe: string;
   tags: string[];
@@ -70,8 +89,20 @@ export interface CatalogueItem {
   /** "Storage" for phones, iPads and Macs; "Size" for watches. Leave out when there is one version. */
   tierName?: 'Storage' | 'Size';
   tiers: Tier[];
+  /** Used phones only: every tier comes in each condition. */
+  conditions?: Condition[];
   colours: Colour[];
 }
+
+/** Sample grades for used phones. The shop can rename them or change prices in the staff desk. */
+const USED_CONDITIONS: Condition[] = [
+  { value: 'Excellent', delta: 0 },
+  { value: 'Good', delta: -8000 },
+];
+const USED_TEXT =
+  '\n\nChecked by Kangaroo before sale: Face ID, cameras, speakers, charging and battery health. Excellent: almost no marks, battery health 90% or more. Good: light marks, battery health 85% or more. Comes with a charging cable.';
+const USED_TEXT_NE =
+  '\n\nबेच्नुअघि कङ्गारुले जाँच गरेको: Face ID, क्यामेरा, स्पिकर, चार्जिङ र ब्याट्री हेल्थ। Excellent: खासै दाग छैन, ब्याट्री हेल्थ ९०% वा बढी। Good: हल्का दाग, ब्याट्री हेल्थ ८५% वा बढी। चार्जिङ केबलसहित।';
 
 const ORANGE = { value: 'Cosmic Orange', swatch: '#e2733a' };
 const DEEP_BLUE = { value: 'Deep Blue', swatch: '#2f3d5c' };
@@ -339,10 +370,161 @@ export const KANGAROO_CATALOGUE: CatalogueItem[] = [
     tiers: [{ value: 'Standard', price: 27999 }],
     colours: WHITE,
   },
+  // ── Used phones (sample stock) ────────────────────────────────────────
+  {
+    name: 'Used iPhone 15 Pro Max',
+    slug: 'used-iphone-15-pro-max',
+    category: 'used-phones',
+    kind: 'phone',
+    style: 'pro-classic',
+    featured: true,
+    description: 'Pre-owned iPhone 15 Pro Max: 6.7-inch display, A17 Pro chip, titanium design and a 5x telephoto camera.' + USED_TEXT,
+    descriptionNe: 'प्रयोग भइसकेको iPhone 15 Pro Max: ६.७ इन्च डिस्प्ले, A17 Pro चिप, टाइटानियम डिजाइन र 5x टेलिफोटो क्यामेरा।' + USED_TEXT_NE,
+    tags: ['iphone', 'used', 'second hand', 'pro'],
+    tierName: 'Storage',
+    tiers: [
+      { value: '256GB', price: 139999 },
+      { value: '512GB', price: 154999 },
+    ],
+    conditions: USED_CONDITIONS,
+    colours: [
+      { value: 'Natural Titanium', swatch: '#bdb6a9' },
+      { value: 'Blue Titanium', swatch: '#3f4a5a' },
+    ],
+  },
+  {
+    name: 'Used iPhone 15 Pro',
+    slug: 'used-iphone-15-pro',
+    category: 'used-phones',
+    kind: 'phone',
+    style: 'pro-classic',
+    description: 'Pre-owned iPhone 15 Pro: 6.1-inch display, A17 Pro chip, titanium design and USB-C.' + USED_TEXT,
+    descriptionNe: 'प्रयोग भइसकेको iPhone 15 Pro: ६.१ इन्च डिस्प्ले, A17 Pro चिप, टाइटानियम डिजाइन र USB-C।' + USED_TEXT_NE,
+    tags: ['iphone', 'used', 'second hand', 'pro'],
+    tierName: 'Storage',
+    tiers: [
+      { value: '128GB', price: 114999 },
+      { value: '256GB', price: 124999 },
+    ],
+    conditions: USED_CONDITIONS,
+    colours: [
+      { value: 'Black Titanium', swatch: '#3a3a3c' },
+      { value: 'White Titanium', swatch: '#e8e6e1' },
+    ],
+  },
+  {
+    name: 'Used iPhone 14',
+    slug: 'used-iphone-14',
+    category: 'used-phones',
+    kind: 'phone',
+    style: 'standard',
+    description: 'Pre-owned iPhone 14: 6.1-inch Super Retina XDR display, A15 Bionic chip and a dual-camera system.' + USED_TEXT,
+    descriptionNe: 'प्रयोग भइसकेको iPhone 14: ६.१ इन्च डिस्प्ले, A15 Bionic चिप र दुईवटा क्यामेरा।' + USED_TEXT_NE,
+    tags: ['iphone', 'used', 'second hand'],
+    tierName: 'Storage',
+    tiers: [
+      { value: '128GB', price: 69999 },
+      { value: '256GB', price: 77999 },
+    ],
+    conditions: USED_CONDITIONS,
+    colours: [
+      { value: 'Purple', swatch: '#d8cde3' },
+      { value: 'Midnight', swatch: '#2f343b' },
+    ],
+  },
+  {
+    name: 'Used iPhone 13',
+    slug: 'used-iphone-13',
+    category: 'used-phones',
+    kind: 'phone',
+    style: 'standard',
+    description: 'Pre-owned iPhone 13: 6.1-inch display, A15 Bionic chip and great battery life. A smart first iPhone.' + USED_TEXT,
+    descriptionNe: 'प्रयोग भइसकेको iPhone 13: ६.१ इन्च डिस्प्ले, A15 Bionic चिप र राम्रो ब्याट्री। पहिलो आईफोनका लागि उत्तम।' + USED_TEXT_NE,
+    tags: ['iphone', 'used', 'second hand', 'value'],
+    tierName: 'Storage',
+    tiers: [{ value: '128GB', price: 54999 }],
+    conditions: USED_CONDITIONS,
+    colours: [
+      { value: 'Blue', swatch: '#2f5f7a' },
+      { value: 'Pink', swatch: '#f3d3d4' },
+    ],
+  },
+  // ── Phone accessories ─────────────────────────────────────────────────
+  {
+    name: 'iPhone 17 Pro Max Silicone Case with MagSafe',
+    slug: 'iphone-17-pro-max-silicone-case-magsafe',
+    category: 'phone-cases',
+    kind: 'case',
+    style: 'silicone',
+    description: 'Soft-touch silicone outside, microfibre lining inside, and built-in magnets for MagSafe chargers and wallets.',
+    descriptionNe: 'बाहिर नरम सिलिकन, भित्र माइक्रोफाइबर, र MagSafe चार्जर तथा वालेटका लागि चुम्बक।',
+    tags: ['case', 'silicone', 'magsafe', 'iphone'],
+    tiers: [{ value: 'Standard', price: 6999 }],
+    colours: [
+      { value: 'Black', swatch: '#2b2b2e' },
+      { value: 'Navy', swatch: '#2e3a55' },
+      { value: 'Sage', swatch: '#9fae95' },
+    ],
+  },
+  {
+    name: 'JBL Flip 6 Portable Speaker',
+    slug: 'jbl-flip-6',
+    category: 'speakers',
+    kind: 'speaker',
+    style: 'flip',
+    description: 'Bold sound in a rugged, waterproof (IP67) body. Up to 12 hours of play on a charge, with Bluetooth to any phone.',
+    descriptionNe: 'पानी नछिर्ने (IP67) बलियो बडीमा दमदार आवाज। एकपटक चार्जमा १२ घण्टासम्म, जुनसुकै फोनसँग ब्लुटुथ।',
+    tags: ['speaker', 'bluetooth', 'jbl', 'audio'],
+    tiers: [{ value: 'Standard', price: 15999 }],
+    colours: [
+      { value: 'Black', swatch: '#1f1f22' },
+      { value: 'Blue', swatch: '#2b5fa8' },
+      { value: 'Red', swatch: '#c8222c' },
+    ],
+  },
+  {
+    name: 'JBL Go 4 Mini Speaker',
+    slug: 'jbl-go-4',
+    category: 'speakers',
+    kind: 'speaker',
+    style: 'mini',
+    description: 'Pocket-size speaker with surprisingly big sound. Waterproof and dustproof (IP67), with a loop to hang it anywhere.',
+    descriptionNe: 'खल्तीमा अट्ने सानो स्पिकर, तर ठूलो आवाज। पानी र धुलो नछिर्ने (IP67), जहाँ पनि झुन्ड्याउन मिल्ने।',
+    tags: ['speaker', 'bluetooth', 'jbl', 'audio'],
+    tiers: [{ value: 'Standard', price: 5999 }],
+    colours: [
+      { value: 'Black', swatch: '#1f1f22' },
+      { value: 'Blue', swatch: '#2b5fa8' },
+      { value: 'Pink', swatch: '#e8a3b8' },
+    ],
+  },
+  {
+    name: 'Dual USB-C Fast Car Charger (45W)',
+    slug: 'dual-usb-c-car-charger-45w',
+    category: 'car-chargers',
+    kind: 'carcharger',
+    description: 'Charges two phones at full speed from your car socket. Fast-charges iPhone to 50% in about 30 minutes.',
+    descriptionNe: 'गाडीको सकेटबाट दुईवटा फोन एकैसाथ छिटो चार्ज। आईफोन करिब ३० मिनेटमा ५०% सम्म।',
+    tags: ['car charger', 'usb-c', 'charger', 'car'],
+    tiers: [{ value: 'Standard', price: 2499 }],
+    colours: [{ value: 'Black', swatch: '#232326' }],
+  },
+  {
+    name: 'Magnetic Wireless Car Mount Charger',
+    slug: 'magnetic-wireless-car-mount-charger',
+    category: 'car-chargers',
+    kind: 'carcharger',
+    style: 'mount',
+    description: 'Snaps your iPhone onto the air vent magnetically and charges it wirelessly while you drive. Works with MagSafe cases.',
+    descriptionNe: 'चलाउँदा आईफोनलाई एसी भेन्टमा चुम्बकले टाँसेर वायरलेस चार्ज गर्छ। MagSafe केससँग चल्छ।',
+    tags: ['car charger', 'magsafe', 'wireless', 'car', 'mount'],
+    tiers: [{ value: 'Standard', price: 4999 }],
+    colours: [{ value: 'Black', swatch: '#232326' }],
+  },
   {
     name: '20W USB-C Power Adapter',
     slug: 'apple-20w-usb-c-power-adapter',
-    category: 'accessories',
+    category: 'chargers-cables',
     kind: 'adapter',
     description: 'Fast, efficient charging for iPhone, iPad and AirPods. Genuine Apple adapter.',
     descriptionNe: 'आईफोन, आईप्याड र एयरपड्सका लागि छिटो चार्ज गर्ने। सक्कली एप्पल एडाप्टर।',
@@ -353,7 +535,7 @@ export const KANGAROO_CATALOGUE: CatalogueItem[] = [
   {
     name: 'MagSafe Charger (1 m)',
     slug: 'apple-magsafe-charger-1m',
-    category: 'accessories',
+    category: 'chargers-cables',
     kind: 'magsafe',
     description: 'Snaps on magnetically for faster wireless charging of iPhone and AirPods. Genuine Apple accessory.',
     descriptionNe: 'चुम्बकले टाँसिने वायरलेस चार्जर, आईफोन र एयरपड्सका लागि। सक्कली एप्पल सामान।',
@@ -364,7 +546,7 @@ export const KANGAROO_CATALOGUE: CatalogueItem[] = [
   {
     name: 'USB-C Woven Charge Cable (1 m)',
     slug: 'apple-usb-c-woven-cable-1m',
-    category: 'accessories',
+    category: 'chargers-cables',
     kind: 'cable',
     description: 'A durable woven USB-C cable for charging and syncing iPhone, iPad and Mac. Genuine Apple accessory.',
     descriptionNe: 'आईफोन, आईप्याड र म्याक चार्ज गर्न टिकाउ बुनिएको USB-C केबल। सक्कली एप्पल सामान।',
@@ -375,7 +557,7 @@ export const KANGAROO_CATALOGUE: CatalogueItem[] = [
   {
     name: 'iPhone 17 Pro Clear Case with MagSafe',
     slug: 'iphone-17-pro-clear-case-magsafe',
-    category: 'accessories',
+    category: 'phone-cases',
     kind: 'case',
     description: 'Shows off your iPhone colour while protecting it. Built-in magnets for MagSafe chargers and accessories.',
     descriptionNe: 'आईफोनको रङ देखाउँदै सुरक्षा दिने पारदर्शी केस। MagSafe चार्जरका लागि भित्रै चुम्बक।',
@@ -396,13 +578,22 @@ export async function seedKangaroo({ resetSettings = false } = {}) {
     create: { slug: KANGAROO_SLUG, name: 'Kangaroo Mobile Zone', settings: KANGAROO_SETTINGS },
   });
 
+  // The first version had a flat "Accessories" category. Rename it in place so its
+  // products and links carry over to "Phone Accessories".
+  const old = await prisma.category.findUnique({ where: { storeId_slug: { storeId: store.id, slug: 'accessories' } } });
+  const renamed = await prisma.category.findUnique({ where: { storeId_slug: { storeId: store.id, slug: 'phone-accessories' } } });
+  if (old && !renamed) {
+    await prisma.category.update({ where: { id: old.id }, data: { slug: 'phone-accessories', name: 'Phone Accessories' } });
+  }
+
   const categoryId = new Map<string, string>();
   for (const [i, c] of CATEGORIES.entries()) {
     const translations = { ne: { name: c.ne } };
+    const parentId = 'parent' in c ? categoryId.get(c.parent) : undefined;
     const row = await prisma.category.upsert({
       where: { storeId_slug: { storeId: store.id, slug: c.slug } },
-      update: { translations },
-      create: { storeId: store.id, slug: c.slug, name: c.name, sortOrder: i + 1, translations },
+      update: { translations, ...(resetSettings ? { name: c.name, sortOrder: i + 1, parentId: parentId ?? null } : {}) },
+      create: { storeId: store.id, slug: c.slug, name: c.name, sortOrder: i + 1, parentId, translations },
     });
     categoryId.set(c.slug, row.id);
   }
@@ -413,23 +604,40 @@ export async function seedKangaroo({ resetSettings = false } = {}) {
     const exists = await prisma.product.findUnique({ where: { storeId_slug: { storeId: store.id, slug: p.slug } } });
     const translations = { ne: { description: p.descriptionNe } };
     if (exists) {
-      if (resetSettings) await prisma.product.update({ where: { id: exists.id }, data: { translations, description: p.description } });
+      if (resetSettings) {
+        await prisma.product.update({
+          where: { id: exists.id },
+          data: { translations, description: p.description, categoryId: categoryId.get(p.category) },
+        });
+      }
       continue;
     }
 
     const options = [
       ...(p.tierName ? [{ name: p.tierName, values: p.tiers.map((t) => ({ value: t.value })) }] : []),
+      ...(p.conditions ? [{ name: 'Condition', values: p.conditions.map((c) => ({ value: c.value })) }] : []),
       { name: 'Colour', values: p.colours },
     ];
+    const grades = p.conditions ?? [undefined];
     const variants = p.colours.flatMap((c, ci) =>
-      p.tiers.map((t, ti) => ({
-        options: { ...(p.tierName ? { [p.tierName]: t.value } : {}), Colour: c.value },
-        price: toPaisa(t.price),
-        compareAtPrice: t.compareAt ? toPaisa(t.compareAt) : undefined,
-        wholesalePrice: toPaisa(Math.round(t.price * 0.9)),
-        // A few combinations sold out or nearly gone, so the shop looks real.
-        stock: (pi + ci * 2 + ti * 3) % 6,
-      })),
+      p.tiers.flatMap((t, ti) =>
+        grades.map((g, gi) => {
+          const price = t.price + (g?.delta ?? 0);
+          return {
+            options: {
+              ...(p.tierName ? { [p.tierName]: t.value } : {}),
+              ...(g ? { Condition: g.value } : {}),
+              Colour: c.value,
+            },
+            price: toPaisa(price),
+            compareAtPrice: t.compareAt ? toPaisa(t.compareAt) : undefined,
+            wholesalePrice: toPaisa(Math.round(price * 0.9)),
+            // A few combinations sold out or nearly gone, so the shop looks real.
+            // Used phones are single pieces, so at most 2 of each.
+            stock: g ? (pi + ci + ti + gi) % 3 : (pi + ci * 2 + ti * 3) % 6,
+          };
+        }),
+      ),
     );
     const images = p.colours.flatMap((c) => [
       { url: photoPath(p.slug, c.value), alt: `${p.name} in ${c.value}`, width: 800, height: 1000, option: { name: 'Colour', value: c.value } },
